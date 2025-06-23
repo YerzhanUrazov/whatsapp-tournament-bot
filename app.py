@@ -103,9 +103,9 @@ def webhook():
                             user_states[sender] = 'confirm'
 
                         elif state == 'confirm':
-                            if text.lower() == 'да':
+                            if text.lower() == 'da' or text.lower() == 'да':
                                 send_message(sender, "✅ Ваша заявка принята! Спасибо!")
-                                user_data_confirmed[sender] = user_data[sender]  # 👈 сохраняем подтверждённые данные
+                                user_data_confirmed[sender] = user_data[sender]
                                 logging.info(f"📦 Данные участника: {user_data[sender]}")
                             else:
                                 send_message(sender, "Операция отменена.")
@@ -119,7 +119,6 @@ def export_users():
     if not user_data_confirmed:
         return "Нет данных для выгрузки", 200
 
-    # Пишем CSV в память
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(["Номер", "Имя", "Фамилия", "Турнир"])
@@ -131,7 +130,6 @@ def export_users():
             data.get("tournament", "")
         ])
 
-    # Преобразуем в байтовый поток
     mem = BytesIO()
     mem.write(output.getvalue().encode("utf-8"))
     mem.seek(0)
