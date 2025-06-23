@@ -19,6 +19,22 @@ user_data_confirmed = {}  # ✅ сюда сохраняем подтверждё
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 PHONE_NUMBER_ID = "733866206470935"
 
+CONFIRMED_USERS_FILE = "confirmed_users.csv"
+
+# 🔽 Сохраняем в CSV при каждом подтверждении
+def save_confirmed_user_to_file(number, data):
+    is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
+    with open(CONFIRMED_USERS_FILE, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if is_new_file:
+            writer.writerow(["Номер", "Имя", "Фамилия", "Турнир"])
+        writer.writerow([
+            number,
+            data.get("name", ""),
+            data.get("surname", ""),
+            data.get("tournament", "")
+        ])
+
 def convert_to_wa_id(phone):
     if phone.startswith("770"):
         return "78" + phone[1:]
@@ -28,7 +44,7 @@ def send_message(to_number, message_text):
     to_number = to_number.replace("+", "").replace(" ", "")
     to_number = convert_to_wa_id(to_number)
 
-    logging.info(f"📞 Отправка на номер: {to_number}")
+    logging.info(f"\U0001F4DE Отправка на номер: {to_number}")
 
     url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
     headers = {
@@ -48,7 +64,7 @@ def send_message(to_number, message_text):
     if response.status_code != 200:
         logging.error(f"❌ Ошибка отправки: {response.status_code}, {response.text}")
     else:
-        logging.info(f"📤 Отправлено сообщение: {message_text}")
+        logging.info(f"\U0001F4E4 Отправлено сообщение: {message_text}")
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -76,7 +92,7 @@ def webhook():
                         text = message["text"]["body"].strip()
                         sender = message["from"]
 
-                        logging.info(f"📩 Сообщение от {sender}: {text}")
+                        logging.info(f"\U0001F4E9 Сообщение от {sender}: {text}")
 
                         state = user_states.get(sender, 'start')
 
@@ -107,7 +123,8 @@ def webhook():
                                 send_message(sender, "✅ Ваша заявка принята! Спасибо!")
                                 if sender not in user_data_confirmed:
                                     user_data_confirmed[sender] = user_data[sender].copy()
-                                logging.info(f"📦 Данные участника: {user_data[sender]}")
+                                    save_confirmed_user_to_file(sender, user_data[sender])
+                                logging.info(f"\U0001F4E6 Данные участника: {user_data[sender]}")
                             else:
                                 send_message(sender, "Операция отменена.")
                             user_states.pop(sender, None)
@@ -117,27 +134,11 @@ def webhook():
 
 @app.route("/export", methods=["GET"])
 def export_users():
-    if not user_data_confirmed:
+    if not os.path.exists(CONFIRMED_USERS_FILE):
         return "Нет данных для выгрузки", 200
 
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Номер", "Имя", "Фамилия", "Турнир"])
-    for number, data in user_data_confirmed.items():
-        writer.writerow([
-            number,
-            data.get("name", ""),
-            data.get("surname", ""),
-            data.get("tournament", "")
-        ])
-
-    mem = BytesIO()
-    mem.write(output.getvalue().encode("utf-8"))
-    mem.seek(0)
-    output.close()
-
     return send_file(
-        mem,
+        CONFIRMED_USERS_FILE,
         mimetype="text/csv",
         as_attachment=True,
         download_name="users.csv"
