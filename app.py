@@ -6,7 +6,7 @@ import requests
 import os
 import logging
 import csv
-from io import StringIO
+from io import StringIO, BytesIO
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,7 +15,6 @@ app = Flask(__name__)
 user_states = {}  # user_id -> current step
 user_data = {}    # user_id -> {name, surname, tournament}
 user_data_confirmed = {}  # ✅ сюда сохраняем подтверждённых участников
-
 
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 PHONE_NUMBER_ID = "733866206470935"
@@ -108,7 +107,6 @@ def webhook():
                                 send_message(sender, "✅ Ваша заявка принята! Спасибо!")
                                 user_data_confirmed[sender] = user_data[sender]  # 👈 сохраняем подтверждённые данные
                                 logging.info(f"📦 Данные участника: {user_data[sender]}")
-
                             else:
                                 send_message(sender, "Операция отменена.")
                             user_states.pop(sender, None)
@@ -118,14 +116,14 @@ def webhook():
 
 @app.route("/export", methods=["GET"])
 def export_users():
-    if not user_data:
-        return "Нет данных для выгрузки", 404
+    if not user_data_confirmed:
+        return "Нет данных для выгрузки", 200
 
-    csvfile = StringIO()
-    writer = csv.writer(csvfile)
+    # Пишем CSV в память
+    output = StringIO()
+    writer = csv.writer(output)
     writer.writerow(["Номер", "Имя", "Фамилия", "Турнир"])
-
-    for number, data in user_data.items():
+    for number, data in user_data_confirmed.items():
         writer.writerow([
             number,
             data.get("name", ""),
@@ -133,9 +131,14 @@ def export_users():
             data.get("tournament", "")
         ])
 
-    csvfile.seek(0)
+    # Преобразуем в байтовый поток
+    mem = BytesIO()
+    mem.write(output.getvalue().encode("utf-8"))
+    mem.seek(0)
+    output.close()
+
     return send_file(
-        csvfile,
+        mem,
         mimetype="text/csv",
         as_attachment=True,
         download_name="users.csv"
