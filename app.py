@@ -1,10 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, request
+from flask import Flask, request, send_file
 import requests
 import os
 import logging
+import csv
+from io import StringIO
 
 logging.basicConfig(level=logging.INFO)
 
@@ -109,6 +111,31 @@ def webhook():
                             user_data.pop(sender, None)
 
         return "OK", 200
+
+@app.route("/export", methods=["GET"])
+def export_users():
+    if not user_data:
+        return "Нет данных для выгрузки", 404
+
+    csvfile = StringIO()
+    writer = csv.writer(csvfile)
+    writer.writerow(["Номер", "Имя", "Фамилия", "Турнир"])
+
+    for number, data in user_data.items():
+        writer.writerow([
+            number,
+            data.get("name", ""),
+            data.get("surname", ""),
+            data.get("tournament", "")
+        ])
+
+    csvfile.seek(0)
+    return send_file(
+        csvfile,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="users.csv"
+    )
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
