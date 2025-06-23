@@ -97,6 +97,20 @@ def webhook():
 
     return "OK", 200
 
+@app.route("/webhook", methods=["GET"])
+def verify():
+    verify_token = os.getenv("ACCESS_TOKEN")
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
+
+    if mode and token and mode == "subscribe" and token == verify_token:
+        print("✅ Вебхук подтверждён!")
+        return challenge, 200
+    else:
+        return "Ошибка подтверждения", 403
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
     app.run(host="0.0.0.0", port=port)
