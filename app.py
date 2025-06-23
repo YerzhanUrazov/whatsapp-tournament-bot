@@ -22,6 +22,8 @@ PHONE_NUMBER_ID = "733866206470935"
 CONFIRMED_USERS_FILE = "confirmed_users.csv"
 
 # 🔽 Сохраняем в CSV при каждом подтверждении
+# Добавляем без проверки на дубликаты, чтобы сохранить все подтверждённые заявки
+
 def save_confirmed_user_to_file(number, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
     with open(CONFIRMED_USERS_FILE, "a", newline="", encoding="utf-8") as f:
@@ -44,7 +46,7 @@ def send_message(to_number, message_text):
     to_number = to_number.replace("+", "").replace(" ", "")
     to_number = convert_to_wa_id(to_number)
 
-    logging.info(f"\U0001F4DE Отправка на номер: {to_number}")
+    logging.info(f"📞 Отправка на номер: {to_number}")
 
     url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
     headers = {
@@ -64,7 +66,7 @@ def send_message(to_number, message_text):
     if response.status_code != 200:
         logging.error(f"❌ Ошибка отправки: {response.status_code}, {response.text}")
     else:
-        logging.info(f"\U0001F4E4 Отправлено сообщение: {message_text}")
+        logging.info(f"📤 Отправлено сообщение: {message_text}")
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -92,7 +94,7 @@ def webhook():
                         text = message["text"]["body"].strip()
                         sender = message["from"]
 
-                        logging.info(f"\U0001F4E9 Сообщение от {sender}: {text}")
+                        logging.info(f"📩 Сообщение от {sender}: {text}")
 
                         state = user_states.get(sender, 'start')
 
@@ -119,12 +121,11 @@ def webhook():
                             user_states[sender] = 'confirm'
 
                         elif state == 'confirm':
-                            if text.lower() == 'da' or text.lower() == 'да':
+                            if text.lower() in ['да', 'da']:
                                 send_message(sender, "✅ Ваша заявка принята! Спасибо!")
-                                if sender not in user_data_confirmed:
-                                    user_data_confirmed[sender] = user_data[sender].copy()
-                                    save_confirmed_user_to_file(sender, user_data[sender])
-                                logging.info(f"\U0001F4E6 Данные участника: {user_data[sender]}")
+                                user_data_confirmed[sender] = user_data[sender].copy()
+                                save_confirmed_user_to_file(sender, user_data[sender])
+                                logging.info(f"📦 Данные участника: {user_data[sender]}")
                             else:
                                 send_message(sender, "Операция отменена.")
                             user_states.pop(sender, None)
