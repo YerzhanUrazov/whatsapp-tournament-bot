@@ -104,7 +104,9 @@ def webhook():
                         elif state == 'confirm':
                             if text.lower() == 'да':
                                 send_message(sender, "✅ Ваша заявка принята! Спасибо!")
+                                user_data_confirmed[sender] = user_data[sender]  # 👈 сохраняем подтверждённые данные
                                 logging.info(f"📦 Данные участника: {user_data[sender]}")
+
                             else:
                                 send_message(sender, "Операция отменена.")
                             user_states.pop(sender, None)
