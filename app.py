@@ -14,6 +14,8 @@ app = Flask(__name__)
 
 user_states = {}  # user_id -> current step
 user_data = {}    # user_id -> {name, surname, tournament}
+user_data_confirmed = {}  # ✅ сюда сохраняем подтверждённых участников
+
 
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 PHONE_NUMBER_ID = "733866206470935"
