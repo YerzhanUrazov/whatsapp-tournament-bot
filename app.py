@@ -4,6 +4,9 @@ load_dotenv()
 from flask import Flask, request
 import requests
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
@@ -22,7 +25,7 @@ def send_message(to_number, message_text):
     to_number = to_number.replace("+", "").replace(" ", "")
     to_number = convert_to_wa_id(to_number)
 
-    print(f"📞 Отправка на номер: {to_number}")
+    logging.info(f"📞 Отправка на номер: {to_number}")
 
     url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
     headers = {
@@ -40,9 +43,9 @@ def send_message(to_number, message_text):
 
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code != 200:
-        print(f"❌ Ошибка отправки: {response.status_code}, {response.text}")
+        logging.error(f"❌ Ошибка отправки: {response.status_code}, {response.text}")
     else:
-        print(f"📤 Отправлено сообщение: {message_text}")
+        logging.info(f"📤 Отправлено сообщение: {message_text}")
 
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -52,7 +55,7 @@ def webhook():
         challenge = request.args.get("hub.challenge")
 
         if mode and token and mode == "subscribe" and token == "myverifytoken":
-            print("✅ Вебхук подтверждён!")
+            logging.info("✅ Вебхук подтверждён!")
             return challenge, 200
         else:
             return "Ошибка подтверждения", 403
@@ -70,7 +73,7 @@ def webhook():
                         text = message["text"]["body"].strip()
                         sender = message["from"]
 
-                        print(f"Сообщение от {sender}: {text}")
+                        logging.info(f"📩 Сообщение от {sender}: {text}")
 
                         state = user_states.get(sender, 'start')
 
@@ -99,7 +102,7 @@ def webhook():
                         elif state == 'confirm':
                             if text.lower() == 'да':
                                 send_message(sender, "✅ Ваша заявка принята! Спасибо!")
-                                print(f"📦 Данные участника: {user_data[sender]}")
+                                logging.info(f"📦 Данные участника: {user_data[sender]}")
                             else:
                                 send_message(sender, "Операция отменена.")
                             user_states.pop(sender, None)
