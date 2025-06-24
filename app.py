@@ -5,6 +5,8 @@ import logging
 import csv
 from io import StringIO, BytesIO
 from dotenv import load_dotenv
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # ✅ Загрузка переменных окружения, если не продакшн
 if os.environ.get("FLASK_ENV") != "production":
@@ -20,11 +22,13 @@ user_data_confirmed = {}  # ✅ сюда сохраняем подтверждё
 
 ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
 PHONE_NUMBER_ID = "733866206470935"
-
 CONFIRMED_USERS_FILE = "confirmed_users.csv"
 
-# 🔽 Сохраняем в CSV при каждом подтверждении
-# Добавляем без проверки на дубликаты, чтобы сохранить все подтверждённые заявки
+# 🔽 Настройка Google Sheets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("google-credentials.json", scope)
+client = gspread.authorize(creds)
+sheet = client.open("Турнир заявки").sheet1
 
 def save_confirmed_user_to_file(number, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
@@ -38,6 +42,18 @@ def save_confirmed_user_to_file(number, data):
             data.get("surname", ""),
             data.get("tournament", "")
         ])
+
+    try:
+        logging.info("✅ Пытаемся записать в таблицу...")
+        sheet.append_row([
+            number,
+            data.get("name", ""),
+            data.get("surname", ""),
+            data.get("tournament", "")
+        ])
+        logging.info("📄 Добавлено в Google Sheets")
+    except Exception as e:
+        logging.error(f"❌ Ошибка записи в Google Sheets: {e}")
 
 def convert_to_wa_id(phone):
     if phone.startswith("770"):
