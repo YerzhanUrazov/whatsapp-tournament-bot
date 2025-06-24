@@ -1,12 +1,14 @@
-from dotenv import load_dotenv
-load_dotenv()
-
+import os
 from flask import Flask, request, send_file
 import requests
-import os
 import logging
 import csv
 from io import StringIO, BytesIO
+from dotenv import load_dotenv
+
+# ✅ Загрузка переменных окружения, если не продакшн
+if os.environ.get("FLASK_ENV") != "production":
+    load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -16,7 +18,7 @@ user_states = {}  # user_id -> current step
 user_data = {}    # user_id -> {name, surname, tournament}
 user_data_confirmed = {}  # ✅ сюда сохраняем подтверждённых участников
 
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
+ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
 PHONE_NUMBER_ID = "733866206470935"
 
 CONFIRMED_USERS_FILE = "confirmed_users.csv"
