@@ -119,17 +119,17 @@ def webhook():
                             name = user_data[sender]['name']
                             surname = user_data[sender]['surname']
                             tournament = user_data[sender]['tournament']
-                            send_message(sender, f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? (да/нет)")
+                            send_message(sender, f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? Ответьте 1 — Да, 2 — Нет.")
                             user_states[sender] = 'confirm'
 
                         elif state == 'confirm':
-                            if text.lower() in ['да', 'da']:
+                            if text.strip() == '1':
                                 send_message(sender, "✅ Ваша заявка принята! Спасибо!")
                                 user_data_confirmed[sender] = user_data[sender].copy()
                                 save_confirmed_user_to_file(sender, user_data[sender])
                                 logging.info(f"📦 Данные участника: {user_data[sender]}")
                             else:
-                                send_message(sender, "Операция отменена.")
+                                send_message(sender, "❌ Операция отменена.")
                             user_states.pop(sender, None)
                             user_data.pop(sender, None)
 
