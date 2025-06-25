@@ -139,7 +139,9 @@ def webhook():
                         state = user_states.get(sender, 'start')
 
                         if state == 'start':
-                            send_message(sender, "Привет! Пожалуйста, введи своё имя.")
+                            description = get_tournament_description()
+                            greeting = f"Приглашаем Вас принять участие в следующем турнире:\n{description}\n\nДля участия введите своё имя:"
+                            send_message(sender, greeting)
                             user_states[sender] = 'wait_name'
 
                         elif state == 'wait_name':
