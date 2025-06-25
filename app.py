@@ -7,7 +7,6 @@ from io import StringIO, BytesIO
 from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import json
 from datetime import datetime
 
 # ✅ Загрузка переменных окружения, если не продакшн
@@ -31,15 +30,22 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 creds = ServiceAccountCredentials.from_json_keyfile_name("google-credentials.json", scope)
 client = gspread.authorize(creds)
 sheet = client.open("Турнир заявки").sheet1
+config_sheet = client.open("Турнир заявки").worksheet("config")
 
 def get_current_tournament():
     try:
-        with open("tournament_config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-            return config.get("current_tournament", "")
+        return config_sheet.acell("B1").value.strip()
     except Exception as e:
-        logging.error(f"❌ Ошибка чтения турнира из JSON: {e}")
+        logging.error(f"❌ Ошибка чтения турнира из Sheets: {e}")
         return ""
+
+def update_current_tournament(new_tournament):
+    try:
+        config_sheet.update_acell("B1", new_tournament)
+        logging.info(f"📝 Турнир обновлён: {new_tournament}")
+    except Exception as e:
+        logging.error(f"❌ Ошибка обновления турнира в Sheets: {e}")
+
 
 def save_confirmed_user_to_file(number, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
@@ -174,17 +180,10 @@ def admin():
     if request.method == "POST":
         new_tournament = request.form.get("tournament", "").strip()
         if new_tournament:
-            try:
-                with open("tournament_config.json", "w", encoding="utf-8") as f:
-                    json.dump({"current_tournament": new_tournament}, f, ensure_ascii=False, indent=2)
-                return f"✅ Турнир обновлён: {new_tournament}", 200
-            except Exception as e:
-                logging.error(f"Ошибка сохранения турнира: {e}")
-                return "❌ Не удалось сохранить", 500
-    try:
-        current_tournament = get_current_tournament()
-    except:
-        current_tournament = ""
+            update_current_tournament(new_tournament)
+            return f"✅ Турнир обновлён: {new_tournament}", 200
+
+    current_tournament = get_current_tournament()
     return f"""
         <form method="post">
             <label>Текущий турнир:</label><br>
