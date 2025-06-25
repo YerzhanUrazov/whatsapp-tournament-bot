@@ -46,37 +46,6 @@ def get_tournament_description():
         logging.error(f"❌ Ошибка чтения описания турнира из Sheets: {e}")
         return ""
 
-def get_tournament_poster_url():
-    try:
-        return config_sheet.acell("B3").value.strip()
-    except Exception as e:
-        logging.error(f"❌ Ошибка чтения постера турнира из Sheets: {e}")
-        return ""
-
-def send_image(to_number, image_url):
-    to_number = to_number.replace("+", "").replace(" ", "")
-    to_number = convert_to_wa_id(to_number)
-
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to_number,
-        "type": "image",
-        "image": {
-            "link": image_url
-        }
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code != 200:
-        logging.error(f"❌ Ошибка отправки изображения: {response.status_code}, {response.text}")
-    else:
-        logging.info("🖼 Изображение отправлено")
-
 def save_confirmed_user_to_file(number, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
     timestamp = datetime.utcnow() + timedelta(hours=5)
@@ -170,9 +139,6 @@ def webhook():
                         state = user_states.get(sender, 'start')
 
                         if state == 'start':
-                            poster_url = get_tournament_poster_url()
-                            if poster_url:
-                                send_image(sender, poster_url)
                             description = get_tournament_description()
                             greeting = f"Приглашаем Вас принять участие в следующем турнире:\n{description}\n\nДля участия введите своё имя:"
                             send_message(sender, greeting)
