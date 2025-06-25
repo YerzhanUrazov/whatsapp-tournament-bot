@@ -7,6 +7,7 @@ from io import StringIO, BytesIO
 from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
 
 # ✅ Загрузка переменных окружения, если не продакшн
 if os.environ.get("FLASK_ENV") != "production":
@@ -30,6 +31,15 @@ creds = ServiceAccountCredentials.from_json_keyfile_name("google-credentials.jso
 client = gspread.authorize(creds)
 sheet = client.open("Турнир заявки").sheet1
 
+def get_current_tournament():
+    try:
+        with open("tournament_config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+            return config.get("current_tournament", "")
+    except Exception as e:
+        logging.error(f"❌ Ошибка чтения турнира из JSON: {e}")
+        return ""
+
 def save_confirmed_user_to_file(number, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
     with open(CONFIRMED_USERS_FILE, "a", newline="", encoding="utf-8") as f:
@@ -40,16 +50,15 @@ def save_confirmed_user_to_file(number, data):
             number,
             data.get("name", ""),
             data.get("surname", ""),
-            data.get("tournament", "")
+            get_current_tournament()
         ])
 
     try:
-        logging.info("✅ Пытаемся записать в таблицу...")
         sheet.append_row([
             number,
             data.get("name", ""),
             data.get("surname", ""),
-            data.get("tournament", "")
+            get_current_tournament()
         ])
         logging.info("📄 Добавлено в Google Sheets")
     except Exception as e:
@@ -127,14 +136,14 @@ def webhook():
 
                         elif state == 'wait_surname':
                             user_data[sender]['surname'] = text
-                            send_message(sender, "Отлично! Выбери турнир:\n1. Летний\n2. Осенний\n3. Зимний")
+                            send_message(sender, "Отлично! Выбери турнир:")
                             user_states[sender] = 'wait_tournament'
 
                         elif state == 'wait_tournament':
                             user_data[sender]['tournament'] = text
                             name = user_data[sender]['name']
                             surname = user_data[sender]['surname']
-                            tournament = user_data[sender]['tournament']
+                            tournament = get_current_tournament()
                             send_message(sender, f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? Ответьте 1 — Да, 2 — Нет.")
                             user_states[sender] = 'confirm'
 
@@ -162,6 +171,32 @@ def export_users():
         as_attachment=True,
         download_name="users.csv"
     )
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if request.method == "POST":
+        new_tournament = request.form.get("tournament", "").strip()
+        if new_tournament:
+            try:
+                with open("tournament_config.json", "w", encoding="utf-8") as f:
+                    json.dump({"current_tournament": new_tournament}, f, ensure_ascii=False, indent=2)
+                return f"✅ Турнир обновлён: {new_tournament}", 200
+            except Exception as e:
+                logging.error(f"Ошибка сохранения турнира: {e}")
+                return "❌ Не удалось сохранить", 500
+    try:
+        current_tournament = get_current_tournament()
+    except:
+        current_tournament = ""
+    return f"""
+        <form method="post">
+            <label>Текущий турнир:</label><br>
+            <input type="text" name="tournament" value="{current_tournament}" required>
+            <br><br>
+            <button type="submit">Сохранить</button>
+        </form>
+    """
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
