@@ -7,7 +7,7 @@ from io import StringIO, BytesIO
 from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ✅ Загрузка переменных окружения, если не продакшн
 if os.environ.get("FLASK_ENV") != "production":
@@ -39,27 +39,29 @@ def get_current_tournament():
         logging.error(f"❌ Ошибка чтения турнира из Sheets: {e}")
         return ""
 
-def update_current_tournament(new_tournament):
+def get_tournament_description():
     try:
-        config_sheet.update_acell("B1", new_tournament)
-        logging.info(f"📝 Турнир обновлён: {new_tournament}")
+        return config_sheet.acell("B2").value.strip()
     except Exception as e:
-        logging.error(f"❌ Ошибка обновления турнира в Sheets: {e}")
-
+        logging.error(f"❌ Ошибка чтения описания турнира из Sheets: {e}")
+        return ""
 
 def save_confirmed_user_to_file(number, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.utcnow() + timedelta(hours=5)
+    date_str = timestamp.strftime("%Y-%m-%d")
+    time_str = timestamp.strftime("%H:%M:%S")
     with open(CONFIRMED_USERS_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if is_new_file:
-            writer.writerow(["Номер", "Имя", "Фамилия", "Турнир", "Дата и время регистрации"])
+            writer.writerow(["Номер", "Имя", "Фамилия", "Турнир", "Дата", "Время"])
         writer.writerow([
             number,
             data.get("name", ""),
             data.get("surname", ""),
             get_current_tournament(),
-            timestamp
+            date_str,
+            time_str
         ])
 
     try:
@@ -68,7 +70,8 @@ def save_confirmed_user_to_file(number, data):
             data.get("name", ""),
             data.get("surname", ""),
             get_current_tournament(),
-            timestamp
+            date_str,
+            time_str
         ])
         logging.info("📄 Добавлено в Google Sheets")
     except Exception as e:
@@ -174,25 +177,6 @@ def export_users():
         as_attachment=True,
         download_name="users.csv"
     )
-
-@app.route("/admin", methods=["GET", "POST"])
-def admin():
-    if request.method == "POST":
-        new_tournament = request.form.get("tournament", "").strip()
-        if new_tournament:
-            update_current_tournament(new_tournament)
-            return f"✅ Турнир обновлён: {new_tournament}", 200
-
-    current_tournament = get_current_tournament()
-    return f"""
-        <form method="post">
-            <label>Текущий турнир:</label><br>
-            <input type="text" name="tournament" value="{current_tournament}" required>
-            <br><br>
-            <button type="submit">Сохранить</button>
-        </form>
-    """
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
