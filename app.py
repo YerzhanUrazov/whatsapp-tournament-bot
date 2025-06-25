@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+from datetime import datetime
 
 # ✅ Загрузка переменных окружения, если не продакшн
 if os.environ.get("FLASK_ENV") != "production":
@@ -42,15 +43,17 @@ def get_current_tournament():
 
 def save_confirmed_user_to_file(number, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(CONFIRMED_USERS_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if is_new_file:
-            writer.writerow(["Номер", "Имя", "Фамилия", "Турнир"])
+            writer.writerow(["Номер", "Имя", "Фамилия", "Турнир", "Дата и время регистрации"])
         writer.writerow([
             number,
             data.get("name", ""),
             data.get("surname", ""),
-            get_current_tournament()
+            get_current_tournament(),
+            timestamp
         ])
 
     try:
@@ -58,7 +61,8 @@ def save_confirmed_user_to_file(number, data):
             number,
             data.get("name", ""),
             data.get("surname", ""),
-            get_current_tournament()
+            get_current_tournament(),
+            timestamp
         ])
         logging.info("📄 Добавлено в Google Sheets")
     except Exception as e:
@@ -136,13 +140,6 @@ def webhook():
 
                         elif state == 'wait_surname':
                             user_data[sender]['surname'] = text
-                            send_message(sender, "Отлично! Выбери турнир:")
-                            user_states[sender] = 'wait_tournament'
-
-                        elif state == 'wait_tournament':
-                            user_data[sender]['tournament'] = text
-                            name = user_data[sender]['name']
-                            surname = user_data[sender]['surname']
                             tournament = get_current_tournament()
                             send_message(sender, f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? Ответьте 1 — Да, 2 — Нет.")
                             user_states[sender] = 'confirm'
