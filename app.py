@@ -180,9 +180,9 @@ def export_users():
         download_name="users.csv"
     )
 
-@app.route("/")
+@app.route("/ping")
 def ping():
-    return "👋 Bot is alive", 200
+    return "OK", 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
