@@ -182,7 +182,7 @@ def export_users():
 
 @app.route("/ping")
 def ping():
-    return "OK", 200
+    return "", 204  # No Content
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
