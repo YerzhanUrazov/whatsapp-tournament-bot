@@ -1,7 +1,7 @@
 import os
 from flask import Flask, request
 from telegram import Update
-from telegram.ext import Application, ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import asyncio
 
 # Загрузка токена
@@ -30,6 +30,7 @@ async def init_webhook():
 
     print("✅ Новый код загружен! (init_webhook)")
     await application.initialize()
+    await application.start()
     await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
     print("🚀 Вебхук установлен!")
 
