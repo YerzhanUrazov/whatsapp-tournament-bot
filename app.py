@@ -148,6 +148,8 @@ async def telegram_webhook():
 
 def main():
     global application
+    print("✅ Новый код загружен!")  # 👈 Добавь сюда
+
     TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
