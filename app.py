@@ -165,13 +165,12 @@ def main():
 
     async def init_webhook():
         print("✅ Новый код загружен! (init_webhook)")
-        await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
         await application.initialize()
+        await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
         print("🚀 Вебхук установлен!")
 
     asyncio.run(init_webhook())
 
 if __name__ == "__main__":
     main()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5001)))
-    print("🚀 Flask сервер запущен!")
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
