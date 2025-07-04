@@ -139,10 +139,6 @@ def export_users():
 def ping():
     return "", 204
 
-@app.before_first_request
-def setup_webhook():
-    asyncio.create_task(init_webhook())
-
 async def telegram_webhook():
     data = await request.get_json()
     update = Update.de_json(data, application.bot)
@@ -171,4 +167,5 @@ conv_handler = ConversationHandler(
 application.add_handler(conv_handler)
 
 if __name__ == "__main__":
+    asyncio.run(init_webhook())
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
