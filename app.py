@@ -9,7 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, filters,
+    Application, ApplicationBuilder, CommandHandler, MessageHandler, filters,
     ContextTypes, ConversationHandler
 )
 
@@ -139,7 +139,10 @@ def export_users():
 def ping():
     return "", 204
 
-@app.route(f"/webhook/{os.environ.get('TELEGRAM_BOT_TOKEN')}", methods=["POST"])
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+@app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
 async def telegram_webhook():
     data = await request.get_json()
     update = Update.de_json(data, application.bot)
@@ -147,10 +150,6 @@ async def telegram_webhook():
     return "", 204
 
 def main():
-    global application
-    TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -165,12 +164,14 @@ def main():
     application.add_handler(conv_handler)
 
     async def init_webhook():
-        print("✅ Новый код загружен!")
+        print("✅ Новый код загружен! (init_webhook)")
         await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
         await application.initialize()
+        print("🚀 Вебхук установлен!")
 
     asyncio.run(init_webhook())
 
 if __name__ == "__main__":
     main()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    print("🚀 Flask сервер запущен!")
