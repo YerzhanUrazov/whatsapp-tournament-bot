@@ -21,6 +21,8 @@ logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
+application = None  # 🔄 Глобальная переменная
+
 user_data_confirmed = {}  # ✅ сюда сохраняем подтверждённых участников
 CONFIRMED_USERS_FILE = "confirmed_users.csv"
 
@@ -147,6 +149,7 @@ async def telegram_webhook():
     return "", 204
 
 def main():
+    global application
     import telegram
     print("🚀 Telegram version:", telegram.__version__)
 
