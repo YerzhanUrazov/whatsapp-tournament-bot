@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
+import telegram  # ✅ импортируем telegram напрямую
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
@@ -139,9 +140,10 @@ def export_users():
 def ping():
     return "", 204
 
+@app.route(f"/webhook/{os.environ['TELEGRAM_BOT_TOKEN']}", methods=["POST"])
 async def telegram_webhook():
     data = await request.get_json()
-    update = Update.de_json(data, application.bot)
+    update = telegram.Update.de_json(data, application.bot)
     await application.process_update(update)
     return "", 204
 
