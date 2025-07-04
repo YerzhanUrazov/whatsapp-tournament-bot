@@ -110,14 +110,13 @@ def telegram_webhook():
         reply = greeting
 
     elif user_state == "wait_phone":
-        # Удаляем пробелы, скобки и дефисы
         cleaned = re.sub(r"[\s\-\(\)]", "", text)
-        if re.fullmatch(r"(\+7|87)\d{9,10}", cleaned):
+        if re.fullmatch(r"(\+7\d{10}|87\d{9})", cleaned):
             user_data["phone"] = text
             user_states[chat_id] = "wait_name"
             reply = "Теперь введите имя:"
         else:
-            reply = "⚠️ Пожалуйста, введите корректный номер телефона в формате +7XXXXXXXXXX"
+            reply = "⚠️ Пожалуйста, введите корректный номер телефона в формате +7XXXXXXXXXX или 87XXXXXXXXX"
 
     elif user_state == "wait_name":
         user_data["name"] = text
