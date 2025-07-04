@@ -142,8 +142,9 @@ def ping():
 async def telegram_webhook():
     data = await request.get_json()
     update = Update.de_json(data, application.bot)
-    await application.update_queue.put(update)
+    await application.process_update(update)
     return "", 204
+
 
 def main():
     global application
