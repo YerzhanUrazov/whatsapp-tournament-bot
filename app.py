@@ -1,4 +1,5 @@
 import os
+import asyncio
 from flask import Flask, send_file, request
 import logging
 import csv
@@ -142,14 +143,11 @@ def ping():
 async def telegram_webhook():
     data = await request.get_json()
     update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    await application.update_queue.put(update)
     return "", 204
-
 
 def main():
     global application
-    print("✅ Новый код загружен!")  # 👈 Добавь сюда
-
     TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -165,7 +163,13 @@ def main():
     )
 
     application.add_handler(conv_handler)
-    application.initialize()
+
+    async def init_webhook():
+        print("✅ Новый код загружен!")
+        await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
+        await application.initialize()
+
+    asyncio.run(init_webhook())
 
 if __name__ == "__main__":
     main()
