@@ -154,7 +154,13 @@ def main():
     )
 
     application.add_handler(conv_handler)
-    application.run_polling()
+    application.bot.set_webhook(f"https://whatsapp-tournament-bot.onrender.com/webhook/{TELEGRAM_TOKEN}")
+
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000)),
+        webhook_path=f"/webhook/{TELEGRAM_TOKEN}",
+    )
 
 if __name__ == "__main__":
     main()
