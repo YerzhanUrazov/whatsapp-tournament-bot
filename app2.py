@@ -1,6 +1,5 @@
 import os
 from flask import Flask, request
-import telegram
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import asyncio
@@ -11,25 +10,24 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 # Создаем Flask-приложение
 app = Flask(__name__)
 
-# Создаем Telegram-приложение
-application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
 # Простой хендлер для команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Бот работает ✅")
-
-application.add_handler(CommandHandler("start", start))
 
 # Обработка вебхука
 @app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
 async def telegram_webhook():
     data = await request.get_json()
-    update = telegram.Update.de_json(data, application.bot)
+    update = Update.de_json(data, application.bot)
     await application.process_update(update)
     return "", 204
 
 # Установка вебхука
 async def init_webhook():
+    global application
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+
     print("✅ Новый код загружен! (init_webhook)")
     await application.initialize()
     await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
