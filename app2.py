@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
+import re
 
 # ✅ Загрузка переменных окружения
 if os.environ.get("FLASK_ENV") != "production":
@@ -109,9 +110,14 @@ def telegram_webhook():
         reply = greeting
 
     elif user_state == "wait_phone":
-        user_data["phone"] = text
-        user_states[chat_id] = "wait_name"
-        reply = "Теперь введите имя:"
+        # Удаляем пробелы, скобки и дефисы
+        cleaned = re.sub(r"[\s\-\(\)]", "", text)
+        if re.fullmatch(r"(\+7|87)\d{9,10}", cleaned):
+            user_data["phone"] = text
+            user_states[chat_id] = "wait_name"
+            reply = "Теперь введите имя:"
+        else:
+            reply = "⚠️ Пожалуйста, введите корректный номер телефона в формате +7XXXXXXXXXX"
 
     elif user_state == "wait_name":
         user_data["name"] = text
