@@ -139,10 +139,7 @@ def export_users():
 def ping():
     return "", 204
 
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-@app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
+@app.route(f"/webhook/{os.environ.get('TELEGRAM_BOT_TOKEN')}", methods=["POST"])
 async def telegram_webhook():
     data = await request.get_json()
     update = Update.de_json(data, application.bot)
@@ -152,6 +149,9 @@ async def telegram_webhook():
 def main():
     import telegram
     print("🚀 Telegram version:", telegram.__version__)
+
+    TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -169,13 +169,8 @@ def main():
     async def init_webhook():
         print("✅ Новый код загружен! (init_webhook)")
         await application.initialize()
-        await application.start()  # Это обязательно
-        await application.bot.initialize()  # Иногда требуется
-        await application.set_webhook(
-            url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}"
-        )
+        await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
         print("🚀 Вебхук установлен!")
-
 
     asyncio.run(init_webhook())
 
