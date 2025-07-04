@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import CallbackContext
 
 # ✅ Загрузка переменных окружения, если не продакшн
 if os.environ.get("FLASK_ENV") != "production":
@@ -18,11 +20,11 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 
 user_states = {}  # user_id -> current step
-user_data = {}    # user_id -> {name, surname, tournament}
+user_data = {}    # user_id -> {name, surname, phone}
 user_data_confirmed = {}  # ✅ сюда сохраняем подтверждённых участников
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
+PHONE_NUMBER_ID = "733866206470935"
 CONFIRMED_USERS_FILE = "confirmed_users.csv"
 
 # 🔽 Настройка Google Sheets
@@ -46,15 +48,17 @@ def get_tournament_description():
         logging.error(f"❌ Ошибка чтения описания турнира из Sheets: {e}")
         return ""
 
-def save_confirmed_user_to_file(number, data):
+def save_confirmed_user_to_file(sender, data):
     is_new_file = not os.path.exists(CONFIRMED_USERS_FILE)
     timestamp = datetime.utcnow() + timedelta(hours=5)
     date_str = timestamp.strftime("%Y-%m-%d")
     time_str = timestamp.strftime("%H:%M:%S")
+    number = data.get("phone", sender)
+
     with open(CONFIRMED_USERS_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if is_new_file:
-            writer.writerow(["ID", "Имя", "Фамилия", "Турнир", "Дата", "Время"])
+            writer.writerow(["Номер", "Имя", "Фамилия", "Турнир", "Дата", "Время"])
         writer.writerow([
             number,
             data.get("name", ""),
@@ -77,55 +81,118 @@ def save_confirmed_user_to_file(number, data):
     except Exception as e:
         logging.error(f"❌ Ошибка записи в Google Sheets: {e}")
 
-@app.route(f"/webhook/{BOT_TOKEN}", methods=["POST"])
-def receive_update():
-    data = request.get_json()
-    logging.info(f"➡ Получено: {data}")
-    if "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "").strip()
+def convert_to_wa_id(phone):
+    if phone.startswith("770"):
+        return "78" + phone[1:]
+    return phone
 
-        state = user_states.get(chat_id, 'start')
+def send_message(to_number, message_text):
+    to_number = to_number.replace("+", "").replace(" ", "")
+    to_number = convert_to_wa_id(to_number)
 
-        if state == 'start':
-            description = get_tournament_description()
-            greeting = f"Приглашаем Вас принять участие в следующем турнире:\n{description}\n\nДля участия введите своё имя:"
-            send_telegram_message(chat_id, greeting)
-            user_states[chat_id] = 'wait_name'
+    logging.info(f"📞 Отправка на номер: {to_number}")
 
-        elif state == 'wait_name':
-            user_data[chat_id] = {'name': text}
-            send_telegram_message(chat_id, "Спасибо! Теперь введи фамилию.")
-            user_states[chat_id] = 'wait_surname'
+    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_number,
+        "type": "text",
+        "text": {
+            "body": message_text
+        }
+    }
 
-        elif state == 'wait_surname':
-            user_data[chat_id]['surname'] = text
-            tournament = get_current_tournament()
-            send_telegram_message(chat_id, f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? Ответьте 1 — Да, 2 — Нет.")
-            user_states[chat_id] = 'confirm'
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code != 200:
+        logging.error(f"❌ Ошибка отправки: {response.status_code}, {response.text}")
+    else:
+        logging.info(f"📤 Отправлено сообщение: {message_text}")
 
-        elif state == 'confirm':
-            if text == '1':
-                send_telegram_message(chat_id, "✅ Ваша заявка принята! Спасибо!")
-                user_data_confirmed[chat_id] = user_data[chat_id].copy()
-                save_confirmed_user_to_file(chat_id, user_data[chat_id])
-                logging.info(f"📦 Данные участника: {user_data[chat_id]}")
-            else:
-                send_telegram_message(chat_id, "❌ Операция отменена.")
-            user_states.pop(chat_id, None)
-            user_data.pop(chat_id, None)
-    return {"ok": True}
+# 🔽 Telegram bot logic (номер телефона через кнопку)
+def start(update: Update, context: CallbackContext):
+    button = KeyboardButton("📱 Отправить номер", request_contact=True)
+    reply_markup = ReplyKeyboardMarkup([[button]], one_time_keyboard=True, resize_keyboard=True)
+    update.message.reply_text(
+        "Привет! Для регистрации, пожалуйста, отправьте свой номер телефона:",
+        reply_markup=reply_markup
+    )
+    return "wait_phone"
 
-def send_telegram_message(chat_id, text):
-    requests.post(f"{URL}/sendMessage", json={
-        "chat_id": chat_id,
-        "text": text
-    })
+def receive_phone(update: Update, context: CallbackContext):
+    contact = update.message.contact
+    if contact and contact.phone_number:
+        phone = contact.phone_number
+        context.user_data["phone"] = phone
+        update.message.reply_text("Спасибо! Введите своё имя:")
+        return "wait_name"
+    else:
+        update.message.reply_text("Пожалуйста, нажмите кнопку и отправьте номер.")
+        return "wait_phone"
 
-def set_webhook():
-    webhook_url = f"https://whatsapp-tournament-bot.onrender.com/webhook/{BOT_TOKEN}"
-    r = requests.get(f"{URL}/setWebhook?url={webhook_url}")
-    print("Webhook setup:", r.text)
+@app.route("/webhook", methods=["GET", "POST"])
+def webhook():
+    if request.method == "GET":
+        mode = request.args.get("hub.mode")
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+
+        if mode and token and mode == "subscribe" and token == "myverifytoken":
+            logging.info("✅ Вебхук подтверждён!")
+            return challenge, 200
+        else:
+            return "Ошибка подтверждения", 403
+
+    elif request.method == "POST":
+        data = request.get_json()
+
+        if data and "entry" in data:
+            for entry in data["entry"]:
+                for change in entry.get("changes", []):
+                    value = change.get("value", {})
+                    messages = value.get("messages", [])
+                    if messages:
+                        message = messages[0]
+                        text = message["text"]["body"].strip()
+                        sender = message["from"]
+
+                        logging.info(f"📩 Сообщение от {sender}: {text}")
+
+                        state = user_states.get(sender, 'start')
+
+                        if state == 'start':
+                            description = get_tournament_description()
+                            greeting = f"Приглашаем Вас принять участие в следующем турнире:\n{description}\n\nДля участия введите своё имя:"
+                            send_message(sender, greeting)
+                            user_states[sender] = 'wait_name'
+                            user_data[sender] = {"phone": sender}
+
+                        elif state == 'wait_name':
+                            user_data[sender]['name'] = text
+                            send_message(sender, "Спасибо! Теперь введи фамилию.")
+                            user_states[sender] = 'wait_surname'
+
+                        elif state == 'wait_surname':
+                            user_data[sender]['surname'] = text
+                            tournament = get_current_tournament()
+                            send_message(sender, f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? Ответьте 1 — Да, 2 — Нет.")
+                            user_states[sender] = 'confirm'
+
+                        elif state == 'confirm':
+                            if text.strip() == '1':
+                                send_message(sender, "✅ Ваша заявка принята! Спасибо!")
+                                user_data_confirmed[sender] = user_data[sender].copy()
+                                save_confirmed_user_to_file(sender, user_data[sender])
+                                logging.info(f"📦 Данные участника: {user_data[sender]}")
+                            else:
+                                send_message(sender, "❌ Операция отменена.")
+                            user_states.pop(sender, None)
+                            user_data.pop(sender, None)
+
+        return "OK", 200
 
 @app.route("/export", methods=["GET"])
 def export_users():
@@ -141,9 +208,8 @@ def export_users():
 
 @app.route("/ping")
 def ping():
-    return "", 204
+    return "", 204  # No Content
 
 if __name__ == "__main__":
-    set_webhook()
     port = int(os.environ.get("PORT", 5001))
     app.run(host="0.0.0.0", port=port)
