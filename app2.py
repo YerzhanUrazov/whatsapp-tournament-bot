@@ -17,6 +17,7 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 
 user_data_confirmed = {}
+user_states = {}  # состояние пользователя в чате
 CONFIRMED_USERS_FILE = "confirmed_users.csv"
 
 # 🔽 Настройка Google Sheets
@@ -98,10 +99,38 @@ def telegram_webhook():
     chat_id = message["chat"]["id"]
     text = message.get("text", "")
 
+    user_state = user_states.get(chat_id, "start")
+    user_data = user_data_confirmed.setdefault(chat_id, {})
+
     if text == "/start":
-        reply = "Привет! Добро пожаловать."
+        user_states[chat_id] = "wait_phone"
+        reply = "Привет! Пожалуйста, введите номер телефона:"
+
+    elif user_state == "wait_phone":
+        user_data["phone"] = text
+        user_states[chat_id] = "wait_name"
+        reply = "Теперь введите имя:"
+
+    elif user_state == "wait_name":
+        user_data["name"] = text
+        user_states[chat_id] = "wait_surname"
+        reply = "Отлично! Теперь введите фамилию:"
+
+    elif user_state == "wait_surname":
+        user_data["surname"] = text
+        user_states[chat_id] = "confirm"
+        reply = f"Подтвердите регистрацию на турнир '{get_current_tournament()}'. Ответьте 1 — Да, 2 — Нет."
+
+    elif user_state == "confirm":
+        if text.strip() == "1":
+            save_confirmed_user_to_file(chat_id, user_data)
+            reply = "✅ Ваша заявка принята! Спасибо!"
+        else:
+            reply = "❌ Регистрация отменена."
+        user_states[chat_id] = "done"
+
     else:
-        reply = "Извините, я пока не понимаю это сообщение."
+        reply = "Пожалуйста, начните с команды /start"
 
     token = os.environ['TELEGRAM_BOT_TOKEN']
     send_url = f"https://api.telegram.org/bot{token}/sendMessage"
