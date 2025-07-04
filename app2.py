@@ -1,7 +1,7 @@
 import os
 from flask import Flask, request
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import Application, ApplicationBuilder, CommandHandler, ContextTypes
 import asyncio
 
 # Загрузка токена
@@ -16,10 +16,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Обработка вебхука
 @app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
-async def telegram_webhook():
-    data = await request.get_json()
+def telegram_webhook():
+    data = request.get_json()
     update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    asyncio.create_task(application.process_update(update))
     return "", 204
 
 # Установка вебхука
