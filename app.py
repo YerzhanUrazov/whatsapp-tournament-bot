@@ -150,6 +150,9 @@ async def telegram_webhook():
     return "", 204
 
 def main():
+    import telegram
+    print("🚀 Telegram version:", telegram.__version__)
+
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
