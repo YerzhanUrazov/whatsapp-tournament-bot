@@ -9,7 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
-    Application, ApplicationBuilder, CommandHandler, MessageHandler, filters,
+    ApplicationBuilder, CommandHandler, MessageHandler, filters,
     ContextTypes, ConversationHandler
 )
 
@@ -21,9 +21,7 @@ logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
-application = None  # 🔄 Глобальная переменная
-
-user_data_confirmed = {}  # ✅ сюда сохраняем подтверждённых участников
+user_data_confirmed = {}
 CONFIRMED_USERS_FILE = "confirmed_users.csv"
 
 # 🔽 Настройка Google Sheets
@@ -141,42 +139,36 @@ def export_users():
 def ping():
     return "", 204
 
-@app.route(f"/webhook/{os.environ.get('TELEGRAM_BOT_TOKEN')}", methods=["POST"])
+@app.before_first_request
+def setup_webhook():
+    asyncio.create_task(init_webhook())
+
 async def telegram_webhook():
     data = await request.get_json()
     update = Update.de_json(data, application.bot)
-    await application.update_queue.put(update)
+    await application.process_update(update)
     return "", 204
 
-def main():
-    global application
-    import telegram
-    print("🚀 Telegram version:", telegram.__version__)
+async def init_webhook():
+    print("✅ Новый код загружен! (init_webhook)")
+    await application.initialize()
+    await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{os.environ['TELEGRAM_BOT_TOKEN']}")
+    print("🚀 Вебхук установлен!")
 
-    TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            WAIT_PHONE: [MessageHandler(filters.CONTACT, receive_phone)],
-            WAIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, wait_name)],
-            WAIT_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, wait_surname)],
-            CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)]
-        },
-        fallbacks=[CommandHandler("cancel", cancel)]
-    )
-
-    application.add_handler(conv_handler)
-
-    async def init_webhook():
-        print("✅ Новый код загружен! (init_webhook)")
-        await application.initialize()
-        await application.bot.set_webhook(url=f"{os.environ['RENDER_EXTERNAL_URL']}/webhook/{TELEGRAM_TOKEN}")
-        print("🚀 Вебхук установлен!")
-
-    asyncio.run(init_webhook())
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("start", start)],
+    states={
+        WAIT_PHONE: [MessageHandler(filters.CONTACT, receive_phone)],
+        WAIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, wait_name)],
+        WAIT_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, wait_surname)],
+        CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel)]
+)
+application.add_handler(conv_handler)
 
 if __name__ == "__main__":
-    main()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
