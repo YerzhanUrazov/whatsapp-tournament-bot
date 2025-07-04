@@ -7,7 +7,10 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, filters,
+    ContextTypes, ConversationHandler
+)
 
 # ✅ Загрузка переменных окружения
 if os.environ.get("FLASK_ENV") != "production":
@@ -76,47 +79,47 @@ def save_confirmed_user_to_file(user_id, data):
 # Telegram bot logic
 WAIT_PHONE, WAIT_NAME, WAIT_SURNAME, CONFIRM = range(4)
 
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     button = KeyboardButton("📱 Отправить номер", request_contact=True)
     reply_markup = ReplyKeyboardMarkup([[button]], one_time_keyboard=True, resize_keyboard=True)
-    update.message.reply_text(
+    await update.message.reply_text(
         "Привет! Для регистрации, пожалуйста, отправьте свой номер телефона:",
         reply_markup=reply_markup
     )
     return WAIT_PHONE
 
-def receive_phone(update: Update, context: CallbackContext):
+async def receive_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     if contact and contact.phone_number:
         phone = contact.phone_number
         context.user_data["phone"] = phone
-        update.message.reply_text("Спасибо! Введите своё имя:")
+        await update.message.reply_text("Спасибо! Введите своё имя:")
         return WAIT_NAME
     else:
-        update.message.reply_text("Пожалуйста, нажмите кнопку и отправьте номер.")
+        await update.message.reply_text("Пожалуйста, нажмите кнопку и отправьте номер.")
         return WAIT_PHONE
 
-def wait_name(update: Update, context: CallbackContext):
+async def wait_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["name"] = update.message.text
-    update.message.reply_text("Отлично! Теперь введите свою фамилию:")
+    await update.message.reply_text("Отлично! Теперь введите свою фамилию:")
     return WAIT_SURNAME
 
-def wait_surname(update: Update, context: CallbackContext):
+async def wait_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["surname"] = update.message.text
     tournament = get_current_tournament()
-    update.message.reply_text(f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? Ответьте 1 — Да, 2 — Нет.")
+    await update.message.reply_text(f"Вы уверены, что хотите зарегистрироваться на турнир '{tournament}'? Ответьте 1 — Да, 2 — Нет.")
     return CONFIRM
 
-def confirm(update: Update, context: CallbackContext):
+async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text.strip() == '1':
         save_confirmed_user_to_file(update.effective_user.id, context.user_data)
-        update.message.reply_text("✅ Ваша заявка принята! Спасибо!")
+        await update.message.reply_text("✅ Ваша заявка принята! Спасибо!")
     else:
-        update.message.reply_text("❌ Операция отменена.")
+        await update.message.reply_text("❌ Операция отменена.")
     return ConversationHandler.END
 
-def cancel(update: Update, context: CallbackContext):
-    update.message.reply_text("❌ Регистрация отменена.")
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ Регистрация отменена.")
     return ConversationHandler.END
 
 @app.route("/export", methods=["GET"])
@@ -137,24 +140,21 @@ def ping():
 
 def main():
     TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            WAIT_PHONE: [MessageHandler(Filters.contact, receive_phone)],
-            WAIT_NAME: [MessageHandler(Filters.text & ~Filters.command, wait_name)],
-            WAIT_SURNAME: [MessageHandler(Filters.text & ~Filters.command, wait_surname)],
-            CONFIRM: [MessageHandler(Filters.text & ~Filters.command, confirm)]
+            WAIT_PHONE: [MessageHandler(filters.CONTACT, receive_phone)],
+            WAIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, wait_name)],
+            WAIT_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, wait_surname)],
+            CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)]
         },
         fallbacks=[CommandHandler("cancel", cancel)]
     )
 
-    dp.add_handler(conv_handler)
-
-    updater.start_polling()
-    updater.idle()
+    application.add_handler(conv_handler)
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
