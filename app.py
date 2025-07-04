@@ -1,5 +1,5 @@
 import os
-from flask import Flask, send_file
+from flask import Flask, send_file, request
 import logging
 import csv
 from dotenv import load_dotenv
@@ -138,7 +138,15 @@ def export_users():
 def ping():
     return "", 204
 
+@app.route(f"/webhook/{os.environ.get('TELEGRAM_BOT_TOKEN')}", methods=["POST"])
+async def telegram_webhook():
+    data = await request.get_json()
+    update = Update.de_json(data, application.bot)
+    await application.update_queue.put(update)
+    return "", 204
+
 def main():
+    global application
     TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -154,13 +162,8 @@ def main():
     )
 
     application.add_handler(conv_handler)
-    application.bot.set_webhook(f"https://whatsapp-tournament-bot.onrender.com/webhook/{TELEGRAM_TOKEN}")
-
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),
-        webhook_path=f"/webhook/{TELEGRAM_TOKEN}",
-    )
+    application.initialize()
 
 if __name__ == "__main__":
     main()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
