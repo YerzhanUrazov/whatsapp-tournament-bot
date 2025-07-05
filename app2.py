@@ -106,7 +106,7 @@ def telegram_webhook():
     if text == "/start":
         description = get_tournament_description()
         greeting = (
-            "📣 Приглашаем Вас принять участие в следующем турнире:\n"
+            "📣 Приглашаем Вас принять участие в следующем турнире:\n\n"
             f"{description}\n"
             "\n― ― ― ― ― ― ― ― ― ― ― ― ― ― ― ― ―\n"
             "📲 Для участия введите свой номер телефона без пробелов в формате 87XXXXXXXXX или +7XXXXXXXXXXX:"
